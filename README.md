@@ -1,2 +1,0 @@
-# CSCI-5105-P3
-Project 3 - CSCI 5105
