@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package marketplace;
 
-// --- 3.2 Required Client-Facing Operations ---
+// Required Client-Facing Operations 
 service MarketplaceService {
   // Add a new item listing
   rpc CreateItem(CreateItemRequest) returns (ActionResponse);
@@ -19,14 +19,14 @@ service MarketplaceService {
   // Submit a bid on an auction-enabled item
   rpc PlaceBid(BidRequest) returns (ActionResponse);
 
-  // --- 3.3 Persistent Auction Participation ---
+  // Persistent Auction Participation
   // Join an auction and receive a stream of updates whenever the state changes
   rpc JoinAuction(AuctionRequest) returns (stream AuctionEvent);
 }
 
-// --- 4.1 Controller & Internal Coordination ---
+//  4.1 Controller & Internal Coordination 
 service InternalService {
-  // 5.2 Heartbeat-based failure detection
+  // Heartbeat-based failure detection
   rpc Heartbeat(Ping) returns (Pong);
   
   // Manage replica membership and state transfer
@@ -36,7 +36,7 @@ service InternalService {
   rpc GetFullState(StateRequest) returns (StateResponse);
 }
 
-// --- 3.1 Required Item Schema ---
+//  3.1 Required Item Schema 
 message MarketplaceItem {
   string item_id = 1;
   string seller_id = 2;
@@ -46,11 +46,11 @@ message MarketplaceItem {
   double starting_price = 6;
   double current_price = 7;
   int32 quantity = 8;
-  string status = 9;             // e.g., "AVAILABLE", "SOLD", "AUCTION_ACTIVE"
+  string status = 9;             // "AVAILABLE", "SOLD", "AUCTION_ACTIVE"
   uint64 version = 10;           // version or sequence_number for consistency
 }
 
-// --- Message Definitions ---
+//  Message Definitions 
 
 message CreateItemRequest {
   MarketplaceItem item = 1;
@@ -106,7 +106,7 @@ message AuctionEvent {
   string event_description = 3;
 }
 
-// --- Coordination Messages ---
+//  Coordination Messages 
 
 message SyncRequest {
   MarketplaceItem item = 1;
