@@ -2,89 +2,138 @@ syntax = "proto3";
 
 package marketplace;
 
-// --- Client Facing Services ---
-
+// --- 3.2 Required Client-Facing Operations ---
 service MarketplaceService {
-  // Product Operations
-  rpc ListProducts(ListRequest) returns (ListResponse);
-  rpc AddProduct(AddRequest) returns (ActionResponse);
+  // Add a new item listing
+  rpc CreateItem(CreateItemRequest) returns (ActionResponse);
   
-  // Order Operations (Requires Consistency)
-  rpc PlaceOrder(OrderRequest) returns (ActionResponse);
+  // Retrieve current state of a specific item
+  rpc GetItem(GetItemRequest) returns (MarketplaceItem);
   
-  // System/Scaling Info
-  rpc GetSystemStatus(Empty) returns (StatusResponse);
+  // Search items by keyword, category, or filter
+  rpc SearchItems(SearchRequest) returns (SearchResponse);
+  
+  // Update item metadata (description, quantity, status)
+  rpc UpdateItem(UpdateItemRequest) returns (ActionResponse);
+  
+  // Submit a bid on an auction-enabled item
+  rpc PlaceBid(BidRequest) returns (ActionResponse);
+
+  // --- 3.3 Persistent Auction Participation ---
+  // Join an auction and receive a stream of updates whenever the state changes
+  rpc JoinAuction(AuctionRequest) returns (stream AuctionEvent);
 }
 
-// --- Internal Replication Services ---
-
-service ReplicationService {
-  // Used for Primary-Backup or Quorum synchronization
-  rpc SyncState(StateUpdate) returns (SyncResponse);
-  
-  // Heartbeat for failure detection
+// --- 4.1 Controller & Internal Coordination ---
+service InternalService {
+  // 5.2 Heartbeat-based failure detection
   rpc Heartbeat(Ping) returns (Pong);
   
-  // New replica joining the cluster
-  rpc JoinCluster(JoinRequest) returns (JoinResponse);
+  // Manage replica membership and state transfer
+  rpc ReplicateData(SyncRequest) returns (SyncResponse);
+  
+  // Recovery: Replacement replica catches up with state
+  rpc GetFullState(StateRequest) returns (StateResponse);
+}
+
+// --- 3.1 Required Item Schema ---
+message MarketplaceItem {
+  string item_id = 1;
+  string seller_id = 2;
+  string title = 3;
+  string category = 4;
+  string description = 5;
+  double starting_price = 6;
+  double current_price = 7;
+  int32 quantity = 8;
+  string status = 9;             // e.g., "AVAILABLE", "SOLD", "AUCTION_ACTIVE"
+  uint64 version = 10;           // version or sequence_number for consistency
 }
 
 // --- Message Definitions ---
 
-message Product {
-  string id = 1;
-  string name = 2;
-  double price = 3;
-  int32 stock_quantity = 4;
+message CreateItemRequest {
+  MarketplaceItem item = 1;
 }
 
-message ListRequest {
-  string category = 1;
+message GetItemRequest {
+  string item_id = 1;
 }
 
-message ListResponse {
-  repeated Product products = 1;
+message SearchRequest {
+  string query = 1;              // keyword
+  string category = 2;           // optional filter
 }
 
-message AddRequest {
-  Product product = 1;
+message SearchResponse {
+  repeated MarketplaceItem items = 1;
 }
 
-message OrderRequest {
-  string product_id = 1;
-  int32 quantity = 2;
-  string user_id = 3;
+message UpdateItemRequest {
+  string item_id = 1;
+  // Fields to update
+  optional string description = 2;
+  optional int32 quantity = 3;
+  optional string status = 4;
+  uint64 expected_version = 5;    // For optimistic concurrency control
+}
+
+message BidRequest {
+  string item_id = 1;
+  string bidder_id = 2;
+  double bid_amount = 3;
 }
 
 message ActionResponse {
   bool success = 1;
   string message = 2;
+  uint64 new_version = 3;
 }
 
-message StateUpdate {
-  uint64 sequence_number = 1;
-  Product updated_product = 2;
+message AuctionRequest {
+  string item_id = 1;
+  string user_id = 2;
+}
+
+message AuctionEvent {
+  enum EventType {
+    NEW_BID = 0;
+    STATUS_CHANGE = 1;
+    AUCTION_CLOSED = 2;
+  }
+  EventType type = 1;
+  MarketplaceItem item_snapshot = 2;
+  string event_description = 3;
+}
+
+// --- Coordination Messages ---
+
+message SyncRequest {
+  MarketplaceItem item = 1;
+  string primary_id = 2;
 }
 
 message SyncResponse {
-  bool acknowledged = 1;
+  bool success = 1;
 }
 
-message JoinRequest {
+message StateRequest {
   string replica_id = 1;
 }
 
-message JoinResponse {
-  repeated Product initial_state = 1;
-  uint64 last_sequence_number = 2;
+message StateResponse {
+  repeated MarketplaceItem all_items = 1;
 }
 
-message StatusResponse {
-  int32 active_replicas = 1;
-  string role = 2; // e.g., "PRIMARY" or "BACKUP"
-  float load_percentage = 3;
+message Ping {
+  string node_id = 1;
+  enum NodeType {
+    SERVICE = 0;
+    STORAGE = 1;
+  }
+  NodeType type = 2;
 }
 
-message Empty {}
-message Ping { string sender_id = 1; }
-message Pong { bool alive = 1; }
+message Pong {
+  bool healthy = 1;
+}
